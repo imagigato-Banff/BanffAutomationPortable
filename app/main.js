@@ -1,54 +1,50 @@
 const { app, BrowserWindow, dialog } = require("electron");
 const path = require("path");
 const { spawn } = require("child_process");
+const fs = require("fs");
+const os = require("os");
 const net = require("net");
 
 let win;
 let rProc;
 
-function resourcesRoot() {
+function root() {
   return app.isPackaged ? process.resourcesPath : app.getAppPath();
 }
 
-function rscriptPath() {
-  if (process.platform === "win32") {
-    return path.join(resourcesRoot(), "app", "runtime", "win", "R", "bin", "Rscript.exe");
-  }
-  return path.join(resourcesRoot(), "app", "runtime", "mac", "R", "bin", "Rscript");
+function winRRoot() {
+  return path.join(root(), "app", "runtime", "win", "R");
+}
+function winRscript() {
+  return path.join(winRRoot(), "bin", "Rscript.exe");
+}
+function winLib() {
+  return path.join(root(), "app", "runtime", "win", "library");
+}
+function banffApp() {
+  return path.join(root(), "app", "banff-app");
 }
 
-function libPath() {
-  if (process.platform === "win32") {
-    return path.join(resourcesRoot(), "app", "runtime", "win", "library");
-  }
-  return path.join(resourcesRoot(), "app", "runtime", "mac", "library");
-}
-
-function banffAppPath() {
-  return path.join(resourcesRoot(), "app", "banff-app");
-}
-
-function waitForPort(port, host = "127.0.0.1", timeoutMs = 60000) {
+function waitPort(port, host = "127.0.0.1", timeout = 60000) {
   return new Promise((resolve, reject) => {
     const start = Date.now();
-    const tick = () => {
-      const socket = new net.Socket();
-      socket.setTimeout(900);
-      socket.on("connect", () => { socket.destroy(); resolve(true); });
-      socket.on("error", () => { socket.destroy(); retry(); });
-      socket.on("timeout", () => { socket.destroy(); retry(); });
-
+    (function tick() {
+      const s = new net.Socket();
+      s.setTimeout(800);
+      s.once("connect", () => { s.destroy(); resolve(); });
+      s.once("error", retry);
+      s.once("timeout", retry);
       function retry() {
-        if (Date.now() - start > timeoutMs) return reject(new Error("Timeout esperando a Shiny."));
-        setTimeout(tick, 350);
+        s.destroy();
+        if (Date.now() - start > timeout) reject(new Error("Timeout esperando a Shiny."));
+        else setTimeout(tick, 300);
       }
-      socket.connect(port, host);
-    };
-    tick();
+      s.connect(port, host);
+    })();
   });
 }
 
-function fatal(msg) {
+function showFatal(msg) {
   dialog.showErrorBox("Banff Automation System", msg);
   app.quit();
 }
@@ -56,32 +52,59 @@ function fatal(msg) {
 async function startShiny() {
   const port = 3939;
 
-  const rscript = rscriptPath();
-  const lib = libPath().replace(/\\/g, "/");
-  const appDir = banffAppPath().replace(/\\/g, "/");
+  const rscript = winRscript();
+  const libDir = winLib();
+  const appDir = banffApp();
 
+  if (!fs.existsSync(rscript)) throw new Error("No existe Rscript.exe en el bundle.");
+  if (!fs.existsSync(libDir)) throw new Error("No existe runtime/win/library en el bundle.");
+  if (!fs.existsSync(appDir)) throw new Error("No existe app/banff-app en el bundle.");
+
+  const logDir = path.join(os.homedir(), "BanffAutomationLogs");
+  fs.mkdirSync(logDir, { recursive: true });
+  const outLog = path.join(logDir, "electron-r-stdout.log");
+  const errLog = path.join(logDir, "electron-r-stderr.log");
+
+  // Limpia logs previos
+  try { fs.writeFileSync(outLog, ""); } catch {}
+  try { fs.writeFileSync(errLog, ""); } catch {}
+
+  const libPosix = libDir.replace(/\\/g, "/");
+  const appPosix = appDir.replace(/\\/g, "/");
   const rCode = `
-    lib <- "${lib}"
-    appDir <- "${appDir}"
+    lib <- "${libPosix}"
     .libPaths(lib)
-    setwd(appDir)
+    setwd("${appPosix}")
+    cat("LIBPATH=", paste(.libPaths(), collapse=" | "), "\\n")
+    cat("WD=", getwd(), "\\n")
     suppressPackageStartupMessages(library(shiny))
     shiny::runApp(".", host="127.0.0.1", port=${port}, launch.browser=FALSE)
   `;
 
   rProc = spawn(rscript, ["--vanilla", "-e", rCode], {
-    stdio: ["ignore", "ignore", "ignore"],
     env: {
       ...process.env,
-      R_LIBS_USER: libPath()
-    }
+      // claves: obligan a usar TU R y TU library
+      R_HOME: winRRoot(),
+      R_LIBS_USER: libDir,
+      R_LIBS: libDir
+    },
+    stdio: ["ignore", "pipe", "pipe"]
   });
+
+  // Guarda logs SIEMPRE
+  rProc.stdout.on("data", (d) => { try { fs.appendFileSync(outLog, d); } catch {} });
+  rProc.stderr.on("data", (d) => { try { fs.appendFileSync(errLog, d); } catch {} });
 
   rProc.on("exit", (code) => {
-    fatal(`R se cerró (exit code: ${code}).\nAsegura que los paquetes están en:\n${libPath()}`);
+    showFatal(
+      `R se cerró (exit code: ${code}).\n\n` +
+      `Revisa estos logs:\n${outLog}\n${errLog}\n\n` +
+      `Library esperado:\n${libDir}`
+    );
   });
 
-  await waitForPort(port);
+  await waitPort(port);
   return `http://127.0.0.1:${port}`;
 }
 
@@ -91,7 +114,7 @@ app.whenReady().then(async () => {
     win = new BrowserWindow({ width: 1400, height: 900 });
     await win.loadURL(url);
   } catch (e) {
-    fatal(String(e.message || e));
+    showFatal(String(e.message || e));
   }
 });
 
