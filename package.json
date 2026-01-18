@@ -1,0 +1,36 @@
+{
+  "name": "banff-automation-portable",
+  "version": "1.0.0",
+  "description": "Banff Automation System (portable desktop wrapper)",
+  "main": "app/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --win portable",
+    "build:mac": "electron-builder --mac dmg"
+  },
+  "devDependencies": {
+    "electron": "^25.0.0",
+    "electron-builder": "^24.0.0"
+  },
+  "build": {
+    "appId": "com.banff.automation",
+    "productName": "Banff Automation System",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "app/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      { "from": "app/banff-app", "to": "app/banff-app" },
+      { "from": "app/runtime", "to": "app/runtime" }
+    ],
+    "win": {
+      "target": "portable"
+    },
+    "mac": {
+      "target": "dmg"
+    }
+  }
+}

@@ -1,0 +1,373 @@
+---
+title: "Automated Pathology Report"
+date: "`r format(Sys.time(), '%d/%m/%Y')`"
+# geometry: margin = 1cm
+params:
+  # graph_color: na
+  Patient_id: na
+  date_transplant: na
+  date_biopsy: na
+  C4d: na
+  C4d_type: na
+  cg: na
+  ci: na
+  ct: na
+  cv: na
+  g: na
+  i: na
+  i_IFTA: na
+  t_IFTA: na
+  ptc: na
+  ptcml: na
+  ah: na
+  mm: na
+  t: na
+  ti: na
+  v: na
+  PVL: na
+  TMA: na
+  ATI: na
+  DSA: na
+  mmarker: na
+  prior_diagnosis: na
+  AMR_text: na
+  TCMR_text: na
+  TCMR_text_nonCh: na
+  IFTA_text: na
+  BK_text: na
+  note_ABO: na
+  # note_C4d_type: na
+  note_iIFTA: na
+  note_TMA_ATI: na
+  note_cg_TMA_AAMR: na
+  note_DSA_C4d_g_ptc: na
+  note_isolated_v: na
+  note_chronic_inactiveAMR: na
+  note_C4d: na
+  note_AMR_PTCMR_Mixed: na
+  note_BOR: na
+  note_cv: na
+  note_suspicious: na
+  note_micro: na
+  note_DSA: na
+  note_adequate: na
+  note_PVN: na
+  note_ti_NA: na
+  other_diagnoses: na
+  other_diagnoses_warning: na
+  other_diagnoses_free_note: na
+  sclerotic_glomeruli: na
+  number_glomeruli: na
+      
+output:
+  pdf_document: default
+  
+  html_document:
+    df_print: paged
+    
+bibliography: 
+    - banff_ref_total.bibtex
+    # - banff_ref.bibtex
+    # - banff_ref_2017.bibtex
+    # - banff_2015.bibtex
+    # - PVN.bibtex
+nocite: '@*'
+---
+
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = F)
+# library(collapsibleTree)
+# library(webshot)
+library(kableExtra)
+library(dplyr)
+org <- readRDS("./banff_df3.rds")
+# org[org == "i-IFTA < 2"] <- "i-IFTA < 2 or ti < 2"
+# org <- org %>% 
+#     mutate_all(funs(str_replace(., "PTCML", "ptcml")))
+# org[83, 3] <- "i = 1"
+
+# widgetToPng <- function(widget, file = "widget.png",  ...) {
+#     temp <- tempfile(fileext = ".html")
+#     file <- R.utils::getAbsolutePath(file)
+#     htmlwidgets::saveWidget(widget, temp)
+#     webshot(
+#         temp, file,
+#         selector = "#htmlwidget_container",
+#         zoom = 4,
+#         delay = 0.5,
+#         ...
+#     )
+# }
+
+
+DSA_text <- ifelse(is.na(params$DSA), "missing",
+                   ifelse(params$DSA == 1, "positive",
+                          ifelse(params$DSA == 0, "negative", "missing")))
+params_cv <- as.character(params$cv)
+cv_text <- ifelse(params_cv == "0", 0,
+                  ifelse(params_cv == "1", 1,
+                         ifelse(params_cv == "2", 2,
+                                ifelse(params_cv == "3", 3,
+                                       ifelse(params_cv == "new onset/prolif. cv1", 1,
+                                              ifelse(params_cv == "new onset/prolif. cv2", 2,
+                                                     ifelse(params_cv == "new onset/prolif. cv3", 3, NA)))))))
+
+sclerotic_glomeruli <- as.numeric(params$sclerotic_glomeruli)
+number_glomeruli <- as.numeric(params$number_glomeruli)
+
+scle_glom_text <- ifelse(sclerotic_glomeruli > 1, " are ", " is ")
+numb_glo_text <- ifelse(number_glomeruli > 1, " glomeruli ", " glomerule ")
+
+glomeruli_sclerotic <- ifelse(!(is.na(sclerotic_glomeruli) | is.na(number_glomeruli)), paste0(" (", number_glomeruli, numb_glo_text, "of which ", sclerotic_glomeruli, scle_glom_text, "sclerotic)"),
+                              "")
+
+note_adequate <- ifelse(params$note_adequate == 1, paste0("Adequate biopsy, diagnosis can be retained with confidence", glomeruli_sclerotic, "."),
+                        ifelse(params$note_adequate == 2, paste0("Narrow biopsy, diagnosis should be retained with caution", glomeruli_sclerotic, "."),
+                               ifelse(params$note_adequate == 3, paste0("Inadequate biopsy, diagnosis cannot be retained", glomeruli_sclerotic, "."),
+                                      "No information of number of glomeruli or artery to determine the adequacy.")))
+
+```
+
+
+```{r test, results='asis', echo=FALSE, fig.width=10, fig.height=10}
+# patient_ls <- data.frame(Active_Lesion = c("i", "t", "v", "g", "ptc", "C4d", "TMA", "ATI", "PVL", "i-IFTA", "ti"),
+#                Lesion_scores = c(as.character(params$i), as.character(params$t), as.character(params$v),
+#                                  as.character(params$g), as.character(params$ptc), as.character(params$C4d), as.character(params$TMA),
+#                                   as.character(params$ATI), as.character(params$PVL), as.character(params$i_IFTA), as.character(params$ti)),
+#                Chronic_Scores = c("ci", "ct", "cv", "cg", "ptcml", "", "", "", "", "", ""),
+#                Chronic_scores2 = c(as.character(params$ci), as.character(params$ct), as.character(params$cv), as.character(params$cg), as.character(params$ptcml), "", "", "", "", "", ""))
+
+
+diagnosis_ls <-
+    data.frame(AMR_text = params$AMR_text, TCMR_text = params$TCMR_text, TCMR_text_nonCh = params$TCMR_text_nonCh,
+               IFTA_text = params$IFTA_text, BK_text = params$BK_text)
+
+notes_ls <-
+    data.frame(
+      note_ABO = params$note_ABO,
+      # note_C4d_type = params$note_C4d_type,
+      note_TMA_ATI = params$note_TMA_ATI,
+      note_cv = params$note_cv,
+      note_cg_TMA_AAMR = params$note_cg_TMA_AAMR,
+      note_DSA = params$note_DSA,
+      note_iIFTA = params$note_iIFTA,
+      note_DSA_C4d_g_ptc = params$note_DSA_C4d_g_ptc,
+      note_isolated_v = params$note_isolated_v,
+      note_chronic_inactiveAMR = params$note_chronic_inactiveAMR,
+      note_C4d = params$note_C4d,
+      note_AMR_PTCMR_Mixed = params$note_AMR_PTCMR_Mixed,
+      note_BOR = params$note_BOR,
+      note_suspicious = params$note_suspicious,
+      note_micro = params$note_micro,
+      note_PVN = params$note_PVN,
+      note_ti_NA = params$note_ti_NA)
+```
+
+
+```{r, echo = F}
+notes_ls2 <- notes_ls[, !is.na(notes_ls)]
+if (length(notes_ls2) == 1) {
+    notes_ls2 <- as.character(notes_ls2)
+}
+note_recommend <- character()
+```
+
+```{r}
+# notes_ls2
+# !is.null(ncol(notes_ls2))
+# length(notes_ls2) != 0
+# length(notes_ls2)
+```
+
+
+```{r, echo = F, eval = T}
+
+notes_ls2 <- c(note_adequate, notes_ls2)
+if (length(notes_ls2) != 0) {
+    for (i in 1:length(notes_ls2)) {
+        if (i == 1) {
+            note_recommend <- paste0(note_recommend, "- ", notes_ls2[[i]])
+        }
+        else {
+            note_recommend <- paste0(note_recommend, "\n- ", notes_ls2[[i]])
+        }
+    }
+} else {
+    note_recommend <- "No specific recommendation."
+}
+```
+
+
+```{r, echo = F}
+date_biopsy <- ifelse(as.character(params$date_biopsy) == "na", "na",
+                      format(as.Date(params$date_biopsy), '%d/%m/%Y'))
+date_transplant <- ifelse(as.character(params$date_transplant) == "na", "na",
+                          format(as.Date(params$date_transplant), '%d/%m/%Y'))
+```
+
+
+```{r, echo=F}
+tmp <- c("No evidence of AMR", NA_character_, "IFTA No IFTA", "ci or ct are missing",
+         "Polyomavirus Nephropathy No PVN", "Polyomavirus Nephropathy NA", "ci is needed for classification")
+tmp_result <- c(params$AMR_text, params$TCMR_text, params$TCMR_text_nonCh, paste0("IFTA ", params$IFTA_text), paste0("Polyomavirus Nephropathy ", params$BK_text))
+
+
+if (sum(tmp_result %in% tmp) == 5) {
+    result_text <- "No specific lesions"
+} else {
+    tmp_result2 <- tmp_result[!tmp_result %in% tmp]
+    result_text <- paste0(tmp_result2, collapse = ", ")
+}
+
+TMA_ATI_text <- ifelse(params$TMA %in% c("TMA unrelated to AMR") & params$ATI %in% c("ATI"), "TMA unrelated to AMR / ATI",
+                       ifelse(params$TMA %in% c("TMA related to AMR") & params$ATI %in% c("ATI"), "TMA related to AMR / ATI",
+                              ifelse(params$TMA %in% c("TMA unrelated to AMR"), "TMA unrelated to AMR",
+                                     ifelse(params$TMA %in% c("TMA related to AMR"), "TMA related to AMR",
+                                            ifelse(params$ATI %in% c("ATI"), "ATI",
+                                                   "")))))
+
+result_text <- ifelse(result_text == "No specific lesions", TMA_ATI_text, 
+                      ifelse(TMA_ATI_text == "", result_text, paste0(result_text, ", ", TMA_ATI_text)))
+
+other_diagnoses_result <- ifelse(!(is.na(params$other_diagnoses) | is.null(params$other_diagnoses)), paste0("-Other diagnoses: ", params$other_diagnoses), "")
+other_diagnoses_warning <- as.character(params$other_diagnoses_warning)
+other_diagnoses_warning <- ifelse(is.na(other_diagnoses_warning) | result_text %in% "No specific lesions", " ", other_diagnoses_warning)
+other_diagnoses_free_note <- ifelse(!is.na(params$other_diagnoses_free_note), paste0("Details: ", params$other_diagnoses_free_note), " ")
+
+patient_id <- as.character(params$Patient_id)
+```
+
+
+
+## Patient ID: `r patient_id`
+**Date of Biopsy:** `r date_biopsy`
+
+Date of transplantation: `r date_transplant`
+
+
+## **Diagnosis**
+
+### `r other_diagnoses_result`  
+`r other_diagnoses_free_note`  
+`r other_diagnoses_warning`
+
+### **-Banff Diagnosis: `r result_text`**
+
+
+<center>
+
+
+| Acute Banff Scores |  Grading (0,1,2,3)  |  Chronic Banff Scores |  Grading (0,1,2,3)  | Acute & Chronic Banff Scores | Grading (0,1,2,3)
+|:-----------------:|:--------------------:|:------------------:|:---------------------:|:------------------------:|:-------------------:|
+| i | `r params$i` | ci | `r params$ci` | ti | `r params$ti` |
+| t | `r params$t` | ct | `r params$ct` | i-IFTA | `r params$i_IFTA` |
+| v | `r params$v` | cv | `r cv_text` | t-IFTA | `r params$t_IFTA` |
+| g | `r params$g` | cg | `r params$cg` | | |
+| ptc | `r params$ptc` | ptcml | `r params$ptcml` |
+| C4d | `r params$C4d` |  |  |
+| PVL | `r params$PVL` |  |  |
+
+ 
+</center>
+Anti-HLA DSA: `r DSA_text`
+
+
+
+
+
+#### Notes and Suggestions
+
+
+
+`r note_recommend`
+
+
+
+```{r, echo=F}
+#`r note_adequate`
+score_names <- c("i", "t", "v", "g", "ptc", "ci", "ct", "", "cg", "ti", "i-IFTA", "t-IFTA", "ah", "mm", "ptcml", "C4d")
+score_names[8] <- ifelse(grepl("new", params$cv), "", "cv")
+bf_scores <- c(params$i, params$t, params$v, params$g, params$ptc, params$ci, params$ct, params$cv, params$cg, params$ti, params$i_IFTA, params$t_IFTA, params$ah, params$mm, params$ptcml, params$C4d)
+ind <- !(is.na(bf_scores) | bf_scores %in% "NA")
+scores_names_noNA <- score_names[ind]
+bf_scores_noNA <- bf_scores[ind]
+bf_result <- paste0(scores_names_noNA, bf_scores_noNA, collapse = ", ")
+```
+
+
+Banff scores: `r bf_result`
+
+
+
+<!-- \newpage -->
+
+<!-- ######## Visualization of Banff rules -->
+
+
+<!-- ```{r, out.height="100%", out.width="100%"} -->
+<!-- # width 1700, height = 1000, linkLength = 65, fontSize = 5.5 -->
+<!-- # cat() -->
+
+<!-- widgetToPng( -->
+<!--     collapsibleTree(org, hierarchy = names(org), collapsed = F, width = 1700, height = 1000, -->
+<!--                     fontSize = 5.5, root = "Biopsy", fillByLevel = F, linkLength = 65, -->
+<!--                     fill = c("chocolate", -->
+<!--                              params$graph_color)), -->
+<!--     "collapsibleTree.png") -->
+<!-- ``` -->
+
+
+\newpage
+
+## **Explanation of scores**
+
+i – inflammation in non-scarred cortex, scored as 0 (minimal, <10% of non-scarred cortex inflamed), 1 (mild, 10-25%), 2 (moderate 26-50%), 3 (severe, >50%).  The subcapsular cortex should not be considered.
+
+t – tubulitis in cortical tubules, scored as 0 (none), 1 (mild, 1-4 leukocytes per tubular cross-section or 10 tubular epithelial cells in most severely involved tubule), 2 (moderate, 5-10 leukocytes), 3 (severe, >10 leukocytes).  Severely atrophic tubules should NOT be scored.
+
+v – endarteritis, scored as 0 (none), 1 (mild, 1 or more leukocytes directly beneath the endothelium of 1 or more arteries, which typically appears activated with associated subendothelial edema; < 25% luminal occlusion), 2 (moderate, as grade 1, but with >25% luminal occlusion), 3 (severe, with arterial fibrinoid necrosis or transmural inflammation).  Note that only arteries (minimum 2 smooth muscle layers) are scored.
+
+g – glomerulitis, scored as 0 (none), 1 (mild, with >1 leukocyte AND associated endothelial swelling occluding >50% of 1 of more capillary lumina in 1-25% of glomeruli), 2 (moderate, these changes involving 26-50% of glomeruli), 3 (severe, involving >50% of glomeruli).  Ischemic, collapsed glomeruli and glomeruli with >50% sclerosis should not be scored.
+
+ptc – peritubular capillaritis, scored as 0 (minimal, with <3 leukocytes in the most severely involved cortical PTC and/or leukocytes in <10% of cortical PTCs), 1 (mild, with >1 leukocyte in >10% of cortical PTCs and 3-4 leukocytes in the most severely involved PTC), 2 (moderate, as grade 1 but with 5-10 leukocytes in most severely involved PTC), 3 (severe, as grades 1-2 but with >10 leukocytes in most severely involved cortical PTC).  Note that medullary capillaries are NOT scored.
+
+C4d – linear staining in cortical or medullary PTCs by immunofluorescence (IF) or immunohistochemistry (IHC), scored as 0 (none), 1 (minimal, staining in <10% of PTCs), 2 (focal, 10-50% of PTCs), 3 (diffuse, >50% of PTCs).  By IF on frozen sections scores >2 are considered positive; by IHC on paraffin sections all scores >0 are considered positive.
+
+TMA - Acute Thrombotic Microangiopathy in the absence of any other cause
+
+ATI - Acute Tubular Injury in the absence of any other apparent cause
+
+mm - mesangial matrix expansion; expansion of the matrix in the mesangial interspace to exceed the width of 2 mesangial cells inthe average in at least 2 glomerular lobules not used to reach a diagnostic category but is purely descriptive. It is scored, as 0 (no more than mild mesangia matrix increase in any glomerulus), 1 (at least moderate mesangial matrix increase $\leq25$% of nonsclerotic glomeruli), 2 (at least moderate mesangial matrix increase 26% to 50% of nonsclerotic glomeruli), 3 (at least moderate mesangial matrix increase in >50% of nonsclerotic glomeruli)
+
+ah - arteriolar hyalinosis; PAS positive arteriolar hyaline thickening, as a finding of "uncertain significance"
+not used to reach a diagnostic category but is purely descriptive. It is scored as 0 (no PAS positive hyaline arteriolar thickening), 1 (mild to moderate PAS positive hyaline thickening in at least 1 arteriole), 2 (moderate to severe PAS positive hyaline thickening in more than 1 arteriole), 3 (severe PAS positive hyaline thickening in many arterioles)
+
+ci – interstitial fibrosis in cortex, scored as 0 (minimal, <5%), 1 (mild 6 – 25%), 2 (moderate, 26-50%), 3 (severe, >50%).   The subcapsular cortex should not be scored.
+
+ct – tubular atrophy in cortex, scored as 0 (none), 1 (mild, 1-25%), 2 (moderate, 26-50%), 3 (severe, >50%).  The subcapsular cortex should not be scored.
+
+cv – arterial intimal fibrosis, scored as 0 (none), 1 (mild, present but with <25% luminal narrowing in the most involved artery), 2 (moderate, 26-50% luminal narrowing), 3 (severe, >50% luminal narrowing).
+
+cg – chronic glomerulopathy (transplant glomerulopathy), scored as 0 (none, no GBM double contours by light microscopy [LM] or EM), 1a (early mild, no GBM double contours by LM but double contours in >3 glomerular capillaries by EM with associated endothelial swelling and/or subendothelial widening, 1b (mild, GBM double contours by LM in 1-25% of glomerular capillaries by LM in the most severely involved glomerulus), 2 (moderate, double contours by LM in 26-50% of capillaries), 3 (severe, double contours by LM in >50% of capillaries).  Ischemic, collapsed glomeruli and glomeruli with >50% sclerosis should not be scored.
+
+ptcml – peritubular capillary basement membrane multilayering (requires EM), scored as 1 (>7 basement membrane layers in the most affected PTC AND >5 layers in two additional PTCs), 0 (not meeting these criteria), or NA if EM is not performed.
+
+ti – total cortical inflammation, including scarred and non-scarred cortex, scored as 0 (minimal, <10%), 1 (mild, 10-25%), 2 (moderate, 26-50%), 3 (severe, >50%) 
+i-IFTA - inflammation in scarred cortex, scored as 0 (minimal, <10% of non-scarred cortex inflamed OR if the extent of cortical IFTA is <10%), 1 (mild, 10-25% of scarred cortex inflamed), 2 (moderate 26-50% of scarred cortex inflamed), 3 (severe, >50% of scarred cortex inflamed).  The subcapsular cortex should not be considered.
+
+Donor Specific Antibodies - include HLA and non-anti HLA antibodies; note that results for anti-HLA positivity thresholds vary among  centers, so a negative result does not exclude their presence; historic and current DSA should be considered; non anti-HLA antibody (validated to be causal in AMR) should be tested in case of AMR and anti-HLA DSA are negative.
+
+PVL - extent of tubular involvement by viral inclusions detected by LM and IHC (SV40); it is scored as 0 (none), 1 (<1% of tubules), 2 (1-10% of tubules), 3 (>10% of tubules), and NA if SV40 is not performed.
+
+i-IFTA - inflammation in scarred cortex, scored as 0 (absent/minimal, <10% of non-scarred cortex inflamed OR if the extent of cortical IFTA is <10%), 1 (mild, 10-25% of scarred cortex inflamed), 2 (moderate 26-50% of scarred cortex inflamed), 3 (severe, >50% of scarred cortex inflamed).  The subcapsular cortex should not be considered.
+
+t-IFTA – tubulitis in tubules within scarred cortex, scored as 0 (none), 1 (mild, 1-4 mononuclear leukocytes per tubular cross-section or 10 tubular epithelial cells in most severely involved tubule), 2 (moderate, 5-10 mononuclear leukocytes), 3 (severe, >10 mononuclear leukocytes). Severely atrophic tubules should NOT be scored
+
+
+
+\newpage
+# References
+<!-- @roufosse20182018, @haas2018banff, @nickeleit2018banff, @loupy2017banff -->
+
