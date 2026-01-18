@@ -40,7 +40,6 @@ jobs:
        - name: Build macOS dmg
         run: npx electron-builder --mac dmg --publish never
 
-
       - uses: actions/upload-artifact@v4
         with:
           name: BanffAutomation-macOS
