@@ -16,7 +16,7 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-         - name: Download R (Windows portable)
+      - name: Download R (Windows portable)
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path app\runtime\win | Out-Null
