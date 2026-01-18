@@ -37,7 +37,10 @@ function platformKey() {
 }
 
 function runtimeRoot() {
-  return path.join(resourcesRoot(), 'app', 'runtime', platformKey());
+ if (process.platform === "win32") {
+    return path.join(resourcesRoot(), "app", "runtime", "win");
+  }
+  return path.join(resourcesRoot(), "app", "runtime", "mac");
 }
 
 function rBinary() {
