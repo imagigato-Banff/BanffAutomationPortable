@@ -16,20 +16,29 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Download R (Windows portable)
+      - name: Install R into bundle (Windows)
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path app\runtime\win | Out-Null
-          $url = "https://cran.r-project.org/bin/windows/base/R-4.4.2-win.zip"
-          $zip = "$env:RUNNER_TEMP\R.zip"
-          Invoke-WebRequest -Uri $url -OutFile $zip
-          Expand-Archive -Path $zip -DestinationPath app\runtime\win -Force
-
-          if (!(Test-Path "app\runtime\win\R-4.4.2\bin\Rscript.exe")) {
+          New-Item -ItemType Directory -Force -Path app\runtime\win\R | Out-Null
+          $installer = "$env:RUNNER_TEMP\R-latest-win.exe"
+          Invoke-WebRequest -Uri "https://cran.r-project.org/bin/windows/base/R-latest-win.exe" -OutFile $installer
+          $dest = (Resolve-Path "app\runtime\win\R").Path
+          Start-Process -FilePath $installer -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /DIR=`"$dest`"" -Wait
+          if (!(Test-Path "app\runtime\win\R\bin\Rscript.exe")) {
             Write-Host "Rscript.exe not found"
-            Get-ChildItem -Recurse app\runtime\win | Select-Object -First 80
+            Get-ChildItem -Recurse app\runtime\win\R | Select-Object -First 50
             exit 1
           }
+
+      - name: Install R packages into bundle
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path app\runtime\win\library | Out-Null
+          $r = "app\runtime\win\R\bin\Rscript.exe"
+          & $r -e "dir.create('app/runtime/win/library', recursive=TRUE, showWarnings=FALSE);
+                  .libPaths('app/runtime/win/library');
+                  install.packages(c('shiny','shinythemes','tidyverse','dplyr','collapsibleTree','shinycssloaders','shinyWidgets','rmarkdown','knitr','readxl','writexl','kableExtra','stringr','shinyjs'),
+                                   repos='https://cloud.r-project.org')"
 
       - name: Build Windows portable
         run: npm run build:win
@@ -51,7 +60,7 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build macOS dmg (no publish)
+      - name: Build macOS dmg
         run: npx electron-builder --mac dmg --publish never
 
       - uses: actions/upload-artifact@v4
