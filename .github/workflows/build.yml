@@ -16,17 +16,18 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Download R portable (Windows)
+         - name: Download R (Windows portable)
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path app\runtime\win\R | Out-Null
-          $url = "https://github.com/r-windows/bundles/releases/download/latest/R-win.zip"
-          $zip = "$env:RUNNER_TEMP\R-win.zip"
+          New-Item -ItemType Directory -Force -Path app\runtime\win | Out-Null
+          $url = "https://cran.r-project.org/bin/windows/base/R-4.4.2-win.zip"
+          $zip = "$env:RUNNER_TEMP\R.zip"
           Invoke-WebRequest -Uri $url -OutFile $zip
-          Expand-Archive -Path $zip -DestinationPath app\runtime\win\R -Force
-          if (!(Test-Path "app\runtime\win\R\bin\Rscript.exe")) {
-            Write-Host "Rscript.exe not found. Listing files:"
-            Get-ChildItem -Recurse app\runtime\win\R | Select-Object -First 80
+          Expand-Archive -Path $zip -DestinationPath app\runtime\win -Force
+
+          if (!(Test-Path "app\runtime\win\R-4.4.2\bin\Rscript.exe")) {
+            Write-Host "Rscript.exe not found"
+            Get-ChildItem -Recurse app\runtime\win | Select-Object -First 80
             exit 1
           }
 
