@@ -42,31 +42,34 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path app\runtime\win\library | Out-Null
+
+          @"
+          dir.create('app/runtime/win/library', recursive=TRUE, showWarnings=FALSE)
+          .libPaths('app/runtime/win/library')
+
+          options(download.file.method='wininet')
+          repos <- 'https://cloud.r-project.org'
+
+          pkgs <- c(
+            'shiny','httpuv','jsonlite',
+            'tidyverse','dplyr','stringr',
+            'readxl','writexl',
+            'rmarkdown','knitr','kableExtra',
+            'shinythemes','shinyWidgets','shinycssloaders','shinyjs',
+            'collapsibleTree'
+          )
+
+          install.packages(pkgs, repos=repos)
+
+          cat('INSTALLED_OK\n')
+          cat('shiny=', requireNamespace('shiny', quietly=TRUE), '\n')
+          cat('tidyverse=', requireNamespace('tidyverse', quietly=TRUE), '\n')
+          cat('shinythemes=', requireNamespace('shinythemes', quietly=TRUE), '\n')
+          cat('shinyjs=', requireNamespace('shinyjs', quietly=TRUE), '\n')
+          "@ | Set-Content -Encoding UTF8 install_packages.R
+
           $r = "app\runtime\win\R\bin\Rscript.exe"
-
-          & $r --vanilla -e "
-            dir.create('app/runtime/win/library', recursive=TRUE, showWarnings=FALSE);
-            .libPaths('app/runtime/win/library');
-            options(download.file.method='wininet');
-            repos <- 'https://cloud.r-project.org';
-
-            pkgs <- c(
-              'shiny','httpuv','jsonlite',
-              'tidyverse','dplyr','stringr',
-              'readxl','writexl',
-              'rmarkdown','knitr','kableExtra',
-              'shinythemes','shinyWidgets','shinycssloaders','shinyjs',
-              'collapsibleTree'
-            );
-
-            install.packages(pkgs, repos=repos);
-
-            cat('INSTALLED_OK\n');
-            cat('shiny=', requireNamespace('shiny', quietly=TRUE), '\n');
-            cat('tidyverse=', requireNamespace('tidyverse', quietly=TRUE), '\n');
-            cat('shinythemes=', requireNamespace('shinythemes', quietly=TRUE), '\n');
-            cat('shinyjs=', requireNamespace('shinyjs', quietly=TRUE), '\n');
-          "
+          & $r --vanilla install_packages.R
 
       - name: Build Windows portable
         run: npm run build:win
