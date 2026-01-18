@@ -4,25 +4,41 @@ on:
   workflow_dispatch:
 
 jobs:
-  windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
+windows:
+  runs-on: windows-latest
+  steps:
+    - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
+    - uses: actions/setup-node@v4
+      with:
+        node-version: "20"
 
-      - name: Install dependencies
-        run: npm install
+    - name: Install dependencies
+      run: npm install
 
-      - name: Build Windows portable
-        run: npm run build:win
+    - name: Download R portable (Windows)
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Force -Path app\runtime\win\R | Out-Null
+        $url = "https://github.com/r-windows/bundles/releases/download/latest/R-win.zip"
+        $zip = "$env:RUNNER_TEMP\R-win.zip"
+        Invoke-WebRequest -Uri $url -OutFile $zip
+        Expand-Archive -Path $zip -DestinationPath app\runtime\win\R -Force
+        Write-Host "R portable extracted."
+        if (!(Test-Path "app\runtime\win\R\bin\Rscript.exe")) { 
+          Write-Host "Rscript.exe not found in expected path. Listing:" 
+          Get-ChildItem -Recurse app\runtime\win\R | Select-Object -First 50
+          exit 1
+        }
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: BanffAutomation-Windows
-          path: dist/*
+    - name: Build Windows portable
+      run: npm run build:win
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: BanffAutomation-Windows
+        path: dist/*
+
 
   macos:
     runs-on: macos-latest
