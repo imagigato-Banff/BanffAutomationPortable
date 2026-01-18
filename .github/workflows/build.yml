@@ -13,7 +13,7 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Install dependencies
+      - name: Install npm dependencies
         run: npm install
 
       - name: Install R into bundle (Windows)
@@ -23,10 +23,7 @@ jobs:
 
           $rel = Invoke-WebRequest -UseBasicParsing -Uri "https://cran.r-project.org/bin/windows/base/release.html"
           $m = [regex]::Match($rel.Content, 'R-[0-9]+\.[0-9]+\.[0-9]+-win\.exe')
-          if (!$m.Success) {
-            Write-Host "Could not detect R installer from CRAN release.html"
-            exit 1
-          }
+          if (!$m.Success) { Write-Host "Cannot detect R installer"; exit 1 }
 
           $url = "https://cran.r-project.org/bin/windows/base/" + $m.Value
           $installer = "$env:RUNNER_TEMP\" + $m.Value
@@ -46,10 +43,17 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path app\runtime\win\library | Out-Null
           $r = "app\runtime\win\R\bin\Rscript.exe"
-          & $r -e "dir.create('app/runtime/win/library', recursive=TRUE, showWarnings=FALSE);
-                  .libPaths('app/runtime/win/library');
-                  install.packages(c('shiny','shinythemes','tidyverse','dplyr','collapsibleTree','shinycssloaders','shinyWidgets','rmarkdown','knitr','readxl','writexl','kableExtra','stringr','shinyjs'),
-                                   repos='https://cloud.r-project.org')"
+
+          & $r --vanilla -e "dir.create('app/runtime/win/library', recursive=TRUE, showWarnings=FALSE);
+            .libPaths('app/runtime/win/library');
+            options(download.file.method='wininet');
+            install.packages(c(
+              'shiny','shinythemes','tidyverse','dplyr','collapsibleTree',
+              'shinycssloaders','shinyWidgets','rmarkdown','knitr','readxl',
+              'writexl','kableExtra','stringr','shinyjs'
+            ), repos='https://cloud.r-project.org');
+            cat('INSTALLED_OK\n');
+            cat(paste(installed.packages()[,1], collapse=', '))"
 
       - name: Build Windows portable
         run: npm run build:win
@@ -68,10 +72,10 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Install dependencies
+      - name: Install npm dependencies
         run: npm install
 
-      - name: Build macOS dmg
+      - name: Build macOS dmg (no publish)
         run: npx electron-builder --mac dmg --publish never
 
       - uses: actions/upload-artifact@v4
