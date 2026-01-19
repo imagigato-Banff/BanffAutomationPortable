@@ -1,7 +1,7 @@
 {
-  "name": "banff-automation-portable",
+  "name": "banff-automation-system",
   "version": "1.0.0",
-  "description": "Banff Automation System (portable desktop wrapper)",
+  "description": "Banff Automation System - Portable",
   "main": "app/main.js",
   "scripts": {
     "start": "electron .",
@@ -12,6 +12,7 @@
     "electron": "^25.0.0",
     "electron-builder": "^24.0.0"
   },
+  "dependencies": {},
   "build": {
     "appId": "com.banff.automation",
     "productName": "Banff Automation System",
@@ -20,11 +21,14 @@
     },
     "files": [
       "app/**/*",
-      "package.json"
+      "package.json",
+      "node_modules/**/*"
     ],
     "extraResources": [
-      { "from": "app/banff-app", "to": "app/banff-app" },
-      { "from": "app/runtime", "to": "app/runtime" }
+      {
+        "from": "app/run_windows.bat",
+        "to": "app/run_windows.bat"
+      }
     ],
     "win": {
       "target": "portable"
